@@ -33,18 +33,18 @@ jobs:
       shell: cmd
       run: |
         curl -L "https://downloads.haskell.org/~ghc/6.10.3/ghc-6.10.3-i386-windows.exe" -o ghc-installer.exe
-        echo "Installing GHC silently..."
-        :: 预先创建父目录，防止 NSIS 安装器因找不到父级路径而静默报错卡死
+        echo "Installing GHC with comprehensive silent flags..."
         mkdir "C:\Base\Compiler"
-        :: 使用 start /wait 确保主线程阻塞，/S 必须大写，/D 必须放在最后且不能有引号
-        start /wait "" ghc-installer.exe /S /D=C:\Base\Compiler\ghc
+        :: 同时传入 Inno Setup (/VERYSILENT /SUPPRESSMSGBOXES /DIR=...) 和 NSIS (/S /D=...) 的最高级别静默参数，杜绝一切卡死可能
+        start /wait "" ghc-installer.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\Base\Compiler\ghc" /S /D=C:\Base\Compiler\ghc
 
     - name: Download and Install Gtk2Hs 0.10.1
       shell: cmd
       run: |
         set PATH=C:\Base\Compiler\ghc\bin;%PATH%
         curl -L "https://sourceforge.net/projects/gtk2hs/files/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe/download" -o gtk2hs.exe
-        start /wait "" gtk2hs.exe /S
+        :: 同样为 Gtk2Hs 叠满所有静默参数 buff
+        start /wait "" gtk2hs.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /S
 
     - name: Download and Extract 7-zip 9.10 sources
       shell: cmd
