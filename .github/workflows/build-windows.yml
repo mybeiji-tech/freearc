@@ -74,7 +74,7 @@ jobs:
             # 第一优先级：从 GHC 安装目录深处挖出来
             $found = Get-ChildItem -Path "C:\Base\Compiler\ghc" -Filter $tool -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             
-            # 第二优先级：如果 GHC 没带，从 Windows Runner 系统的预装环境中拉取
+            # 第二优先级：如果 GHC 没带，从 Windows Runner 系统的预装环境(如系统的 MinGW)中拉取
             if (-not $found) {
                 $sysPath = (where.exe $tool 2>$null | Select-Object -First 1)
                 if ($sysPath) {
@@ -83,13 +83,8 @@ jobs:
             }
             
             if ($found) {
-                # 修复核心点：如果源文件路径和目标路径不一样，才执行复制；否则直接跳过，防止报错
-                if ($found.FullName -ne $dest) {
-                    Copy-Item -Path $found.FullName -Destination $dest -Force
-                    Write-Host "Fixed Tool Path: $($found.FullName) -> $dest"
-                } else {
-                    Write-Host "Tool is already at the correct location: $dest (Skipped copying)"
-                }
+                Copy-Item -Path $found.FullName -Destination $dest -Force
+                Write-Host "Fixed Tool Path: $($found.FullName) -> $dest"
             } else {
                 Write-Host "Warning: $tool not found anywhere! Compilation might fail if Make calls it directly."
             }
@@ -111,4 +106,57 @@ jobs:
             rd /S /Q "{app}"
         )
         
-        echo "Man
+        echo "Manually registering Gtk2Hs into GHC package database..."
+        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        
+        if exist "register.bat" (
+            call register.bat
+        ) else if exist "lib\import" (
+            for /r %%i in (*.conf) do ghc-pkg register "%%i" --force
+        )
+
+    - name: Extract Local 7-zip 9.10 sources
+      shell: cmd
+      run: |
+        echo "Using locally provided 7z910.tar.bz2 from repository to bypass network issues..."
+        mkdir "C:\!\FreeArchiver\7zip"
+        7z x "%GITHUB_WORKSPACE%\freearc-src\src\7z910.tar.bz2" -o"C:\!\FreeArchiver\7zip" -y
+        7z x "C:\!\FreeArchiver\7zip\7z910.tar" -o"C:\!\FreeArchiver\7zip" -y
+
+    - name: Compile HsLua
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
+        cd /d "C:\!\FreeArchiver\HsLua"
+        make
+
+    - name: Compile SFX modules, Unarc.exe, Unarc.dll and FAR plugin
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
+        cd /d "C:\!\FreeArchiver\Unarc"
+        make
+
+    - name: Compile console version (Arc.exe)
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
+        cd /d "C:\!\FreeArchiver"
+        call compile-O2.cmd
+
+    - name: Compile GUI version (FreeArc.exe)
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
+        cd /d "C:\!\FreeArchiver"
+        call compile-GUI-O2.cmd
+
+    - name: Upload Artifacts (Exe and Dll)
+      uses: actions/upload-artifact@v4
+      with:
+        name: FreeArc-Windows-Binaries
+        path: |
+          C:\!\FreeArchiver\Tests\Arc.exe
+          C:\!\FreeArchiver\Tests\FreeArc.exe
+          C:\!\FreeArchiver\Unarc\Unarc.exe
+          C:\!\FreeArchiver\Unarc\Unarc.dll
