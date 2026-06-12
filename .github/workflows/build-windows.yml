@@ -59,20 +59,18 @@ jobs:
         set PATH=C:\Base\Compiler\ghc\bin;%PATH%
         
         :: 寻找解压出来的 .conf 或者是通过 ghc-pkg 直接注册。
-        :: Gtk2Hs 包含多个子包（glib, pango, cairo, gtk）。旧版通常会自带一个注册批处理或 .conf 文件。
-        :: 如果解压目录里有 setup.exe 或 register.bat，我们直接调用它。
         if exist "register.bat" (
             call register.bat
         ) else if exist "lib\import" (
             echo "Generating manual package registration if needed..."
-            :: 绝大多数旧版 gtk2hs 会在 lib 目录下留有 pkg.conf
             for /r %%i in (*.conf) do ghc-pkg register "%%i" --force
         )
 
     - name: Download and Extract 7-zip 9.10 sources
       shell: cmd
       run: |
-        curl -L "https://sourceforge.net/projects/sevenzip/files/7-Zip/9.10%20beta/7z910.tar.bz2/download" -o 7z910.tar.bz2
+        :: 修复 SourceForge 下载链接，使用 downloads API 并伪装 User-Agent，防止下载到 HTML 网页
+        curl -L -A "Mozilla/5.0" "https://downloads.sourceforge.net/project/sevenzip/7-Zip/9.10%20beta/7z910.tar.bz2" -o 7z910.tar.bz2
         mkdir "C:\!\FreeArchiver\7zip"
         7z x 7z910.tar.bz2 -o"C:\!\FreeArchiver\7zip"
         7z x "C:\!\FreeArchiver\7zip\7z910.tar" -o"C:\!\FreeArchiver\7zip" -y
@@ -101,7 +99,6 @@ jobs:
     - name: Compile GUI version (FreeArc.exe)
       shell: cmd
       run: |
-        :: 编译 GUI 版本必须同时能给 GHC 访问到 gtk2hs 的 bin 目录（里面有 gtk 的 dll 后缀等）
         set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
         cd "C:\!\FreeArchiver"
         call compile-GUI-O2.cmd
