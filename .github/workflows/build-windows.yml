@@ -26,9 +26,15 @@ jobs:
         mkdir "C:\!\FreeArchiver"
         xcopy /E /I /H /Y "%GITHUB_WORKSPACE%\freearc-src\*" "C:\!\FreeArchiver\"
         
-        :: 核心修复：生成 HsLua 和 Unarc 编译前必须引用的公共 Makefile 配置文件
+        :: 核心修复1：生成 HsLua 和 Unarc 编译前必须引用的公共 Makefile 配置文件
         echo "Generating common.mak for Windows compilation..."
         copy "C:\!\FreeArchiver\win32-common.mak" "C:\!\FreeArchiver\common.mak"
+
+        :: 核心修复2：提前创建 Makefile 需要的所有中间编译临时目录，防止 gcc 写入失败
+        echo "Creating temp output directories..."
+        mkdir "C:\temp\out\FreeArc-unarc"
+        mkdir "C:\temp\out\FreeArc"
+        mkdir "C:\temp\out\HsLua"
 
     - name: Install Build Tools (Make and InnoUnp)
       shell: cmd
