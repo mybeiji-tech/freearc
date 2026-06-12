@@ -16,7 +16,6 @@ jobs:
       uses: actions/checkout@v4
       with:
         path: freearc-src
-        # 核心修复：拉取所有的 Git Submodules，防止 HsLua 等依赖文件夹为空！
         submodules: recursive
         fetch-depth: 0
 
@@ -26,6 +25,10 @@ jobs:
         echo "Creating hardcoded paths required by Makefile..."
         mkdir "C:\!\FreeArchiver"
         xcopy /E /I /H /Y "%GITHUB_WORKSPACE%\freearc-src\*" "C:\!\FreeArchiver\"
+        
+        :: 核心修复：生成 HsLua 和 Unarc 编译前必须引用的公共 Makefile 配置文件
+        echo "Generating common.mak for Windows compilation..."
+        copy "C:\!\FreeArchiver\win32-common.mak" "C:\!\FreeArchiver\common.mak"
 
     - name: Install Build Tools (Make and InnoUnp)
       shell: cmd
@@ -81,8 +84,6 @@ jobs:
       run: |
         set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
         cd /d "C:\!\FreeArchiver\HsLua"
-        :: 打印出文件夹里的所有内容，确认 Makefile 存在
-        dir
         make
 
     - name: Compile SFX modules, Unarc.exe, Unarc.dll and FAR plugin
