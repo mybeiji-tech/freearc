@@ -28,7 +28,6 @@ jobs:
       shell: cmd
       run: |
         choco install make --yes
-        :: 安装 innounp 用来强行解压一切顽固的 Inno Setup 安装包
         choco install innounp --yes
 
     - name: Download and Install GHC 6.10.3
@@ -42,14 +41,14 @@ jobs:
     - name: Extract and Manually Register Gtk2Hs 0.10.1
       shell: cmd
       run: |
-        curl -L "https://sourceforge.net/projects/gtk2hs/files/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe/download" -o gtk2hs.exe
-        mkdir "C:\Base\Compiler\gtk2hs"
+        echo "Using direct mirror to bypass SourceForge HTML redirects..."
+        curl -L "https://jaist.dl.sourceforge.net/project/gtk2hs/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe" -o gtk2hs.exe || curl -L "https://master.dl.sourceforge.net/project/gtk2hs/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe" -o gtk2hs.exe
         
+        mkdir "C:\Base\Compiler\gtk2hs"
         echo "Forcing extraction of Gtk2Hs using innounp..."
         cd /d "C:\Base\Compiler\gtk2hs"
         innounp -x -y "%GITHUB_WORKSPACE%\gtk2hs.exe"
         
-        :: 很多时候 innounp 会把文件解压到 {app} 文件夹下，将其规范化
         if exist "{app}" (
             xcopy /E /I /H /Y "{app}\*" ".\"
             rd /S /Q "{app}"
@@ -58,7 +57,6 @@ jobs:
         echo "Manually registering Gtk2Hs into GHC package database..."
         set PATH=C:\Base\Compiler\ghc\bin;%PATH%
         
-        :: 寻找解压出来的 .conf 或者是通过 ghc-pkg 直接注册。
         if exist "register.bat" (
             call register.bat
         ) else if exist "lib\import" (
@@ -69,10 +67,22 @@ jobs:
     - name: Download and Extract 7-zip 9.10 sources
       shell: cmd
       run: |
-        :: 修复 SourceForge 下载链接，使用 downloads API 并伪装 User-Agent，防止下载到 HTML 网页
-        curl -L -A "Mozilla/5.0" "https://downloads.sourceforge.net/project/sevenzip/7-Zip/9.10%20beta/7z910.tar.bz2" -o 7z910.tar.bz2
+        echo "Bypassing SourceForge HTML redirect by using direct physical mirror links..."
+        :: 尝试多个直连物理镜像，彻底防止下载到 SourceForge 的镜像选择网页
+        curl -L "https://jaist.dl.sourceforge.net/project/sevenzip/7-Zip/9.10%20beta/7z910.tar.bz2" -o 7z910.tar.bz2 || curl -L "https://master.dl.sourceforge.net/project/sevenzip/7-Zip/9.10%20beta/7z910.tar.bz2" -o 7z910.tar.bz2 || curl -L "https://nchc.dl.sourceforge.net/project/sevenzip/7-Zip/9.10%20beta/7z910.tar.bz2" -o 7z910.tar.bz2
+        
+        :: 强制校验文件大小（正常的源码包约在 1MB 左右）。如果小于 500KB，说明下到了网页。
+        for %%I in (7z910.tar.bz2) do (
+            echo Downloaded file size: %%~zI bytes
+            if %%~zI LSS 500000 (
+                echo "ERROR: Downloaded file is too small! SourceForge returned an HTML page instead of the actual archive."
+                type 7z910.tar.bz2
+                exit /b 1
+            )
+        )
+        
         mkdir "C:\!\FreeArchiver\7zip"
-        7z x 7z910.tar.bz2 -o"C:\!\FreeArchiver\7zip"
+        7z x 7z910.tar.bz2 -o"C:\!\FreeArchiver\7zip" -y
         7z x "C:\!\FreeArchiver\7zip\7z910.tar" -o"C:\!\FreeArchiver\7zip" -y
 
     - name: Compile HsLua
