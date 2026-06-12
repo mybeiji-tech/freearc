@@ -41,8 +41,8 @@ jobs:
     - name: Extract and Manually Register Gtk2Hs 0.10.1
       shell: cmd
       run: |
-        echo "Using direct mirror to bypass SourceForge HTML redirects..."
-        curl -L "https://jaist.dl.sourceforge.net/project/gtk2hs/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe" -o gtk2hs.exe || curl -L "https://master.dl.sourceforge.net/project/gtk2hs/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe" -o gtk2hs.exe
+        echo "Using direct mirrors and Web Archive fallback for Gtk2Hs..."
+        curl -L "https://jaist.dl.sourceforge.net/project/gtk2hs/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe" -o gtk2hs.exe || curl -L "https://master.dl.sourceforge.net/project/gtk2hs/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe" -o gtk2hs.exe || curl -L "https://web.archive.org/web/20130605051936/http://downloads.sourceforge.net/project/gtk2hs/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe" -o gtk2hs.exe
         
         mkdir "C:\Base\Compiler\gtk2hs"
         echo "Forcing extraction of Gtk2Hs using innounp..."
@@ -64,25 +64,13 @@ jobs:
             for /r %%i in (*.conf) do ghc-pkg register "%%i" --force
         )
 
-    - name: Download and Extract 7-zip 9.10 sources
+    - name: Extract Local 7-zip 9.10 sources
       shell: cmd
       run: |
-        echo "Bypassing SourceForge HTML redirect by using direct physical mirror links..."
-        :: 尝试多个直连物理镜像，彻底防止下载到 SourceForge 的镜像选择网页
-        curl -L "https://jaist.dl.sourceforge.net/project/sevenzip/7-Zip/9.10%20beta/7z910.tar.bz2" -o 7z910.tar.bz2 || curl -L "https://master.dl.sourceforge.net/project/sevenzip/7-Zip/9.10%20beta/7z910.tar.bz2" -o 7z910.tar.bz2 || curl -L "https://nchc.dl.sourceforge.net/project/sevenzip/7-Zip/9.10%20beta/7z910.tar.bz2" -o 7z910.tar.bz2
-        
-        :: 强制校验文件大小（正常的源码包约在 1MB 左右）。如果小于 500KB，说明下到了网页。
-        for %%I in (7z910.tar.bz2) do (
-            echo Downloaded file size: %%~zI bytes
-            if %%~zI LSS 500000 (
-                echo "ERROR: Downloaded file is too small! SourceForge returned an HTML page instead of the actual archive."
-                type 7z910.tar.bz2
-                exit /b 1
-            )
-        )
-        
+        echo "Using locally provided 7z910.tar.bz2 from repository to bypass network issues..."
         mkdir "C:\!\FreeArchiver\7zip"
-        7z x 7z910.tar.bz2 -o"C:\!\FreeArchiver\7zip" -y
+        :: 直接从本地仓库的 src 目录下读取你上传好的压缩包进行解压
+        7z x "%GITHUB_WORKSPACE%\freearc-src\src\7z910.tar.bz2" -o"C:\!\FreeArchiver\7zip" -y
         7z x "C:\!\FreeArchiver\7zip\7z910.tar" -o"C:\!\FreeArchiver\7zip" -y
 
     - name: Compile HsLua
