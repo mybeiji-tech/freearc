@@ -21,7 +21,6 @@ jobs:
       shell: cmd
       run: |
         echo "Creating hardcoded paths required by Makefile..."
-        :: 注意：这里去掉了预先创建 GHC 目录的命令，避免触发安装包的覆盖询问弹窗
         mkdir "C:\!\FreeArchiver"
         xcopy /E /I /H /Y "%GITHUB_WORKSPACE%\freearc-src\*" "C:\!\FreeArchiver\"
 
@@ -34,16 +33,17 @@ jobs:
       shell: cmd
       run: |
         curl -L "https://downloads.haskell.org/~ghc/6.10.3/ghc-6.10.3-i386-windows.exe" -o ghc-installer.exe
-        echo "Extracting GHC bypassing installer GUI..."
-        :: 暴力解压代替执行安装包，100% 杜绝 CI 环境后台卡死
-        7z x ghc-installer.exe -o"C:\Base\Compiler\ghc" -y
+        echo "Installing GHC silently..."
+        :: 预先创建父目录，防止 NSIS 安装器因找不到父级路径而静默报错卡死
+        mkdir "C:\Base\Compiler"
+        :: 使用 start /wait 确保主线程阻塞，/S 必须大写，/D 必须放在最后且不能有引号
+        start /wait "" ghc-installer.exe /S /D=C:\Base\Compiler\ghc
 
     - name: Download and Install Gtk2Hs 0.10.1
       shell: cmd
       run: |
         set PATH=C:\Base\Compiler\ghc\bin;%PATH%
         curl -L "https://sourceforge.net/projects/gtk2hs/files/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe/download" -o gtk2hs.exe
-        :: 使用 start /wait 确保在无头服务器中静默执行完毕再进入下一步
         start /wait "" gtk2hs.exe /S
 
     - name: Download and Extract 7-zip 9.10 sources
