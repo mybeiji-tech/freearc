@@ -24,29 +24,50 @@ jobs:
         mkdir "C:\!\FreeArchiver"
         xcopy /E /I /H /Y "%GITHUB_WORKSPACE%\freearc-src\*" "C:\!\FreeArchiver\"
 
-    - name: Install Make
+    - name: Install Build Tools (Make and InnoUnp)
       shell: cmd
       run: |
         choco install make --yes
+        :: 安装 innounp 用来强行解压一切顽固的 Inno Setup 安装包
+        choco install innounp --yes
 
     - name: Download and Install GHC 6.10.3
       shell: cmd
       run: |
         curl -L "https://downloads.haskell.org/~ghc/6.10.3/ghc-6.10.3-i386-windows.exe" -o ghc-installer.exe
-        echo "Installing GHC with comprehensive silent flags..."
+        echo "Installing GHC..."
         mkdir "C:\Base\Compiler\ghc"
-        :: 同时传入 Inno Setup (/VERYSILENT /SUPPRESSMSGBOXES /DIR=...) 和 NSIS (/S /D=...) 的最高级别静默参数
         start /wait "" ghc-installer.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\Base\Compiler\ghc" /S /D=C:\Base\Compiler\ghc
 
-    - name: Download and Install Gtk2Hs 0.10.1
+    - name: Extract and Manually Register Gtk2Hs 0.10.1
       shell: cmd
       run: |
         curl -L "https://sourceforge.net/projects/gtk2hs/files/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe/download" -o gtk2hs.exe
-        echo "Installing Gtk2Hs silently so it properly registers with GHC..."
         mkdir "C:\Base\Compiler\gtk2hs"
-        :: 必须将 GHC 加入 PATH，否则 Gtk2Hs 安装程序找不到 GHC，无法完成 ghc-pkg 注册
+        
+        echo "Forcing extraction of Gtk2Hs using innounp..."
+        cd /d "C:\Base\Compiler\gtk2hs"
+        innounp -x -y "%GITHUB_WORKSPACE%\gtk2hs.exe"
+        
+        :: 很多时候 innounp 会把文件解压到 {app} 文件夹下，将其规范化
+        if exist "{app}" (
+            xcopy /E /I /H /Y "{app}\*" ".\"
+            rd /S /Q "{app}"
+        )
+        
+        echo "Manually registering Gtk2Hs into GHC package database..."
         set PATH=C:\Base\Compiler\ghc\bin;%PATH%
-        start /wait "" gtk2hs.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\Base\Compiler\gtk2hs" /S /D=C:\Base\Compiler\gtk2hs
+        
+        :: 寻找解压出来的 .conf 或者是通过 ghc-pkg 直接注册。
+        :: Gtk2Hs 包含多个子包（glib, pango, cairo, gtk）。旧版通常会自带一个注册批处理或 .conf 文件。
+        :: 如果解压目录里有 setup.exe 或 register.bat，我们直接调用它。
+        if exist "register.bat" (
+            call register.bat
+        ) else if exist "lib\import" (
+            echo "Generating manual package registration if needed..."
+            :: 绝大多数旧版 gtk2hs 会在 lib 目录下留有 pkg.conf
+            for /r %%i in (*.conf) do ghc-pkg register "%%i" --force
+        )
 
     - name: Download and Extract 7-zip 9.10 sources
       shell: cmd
@@ -59,28 +80,29 @@ jobs:
     - name: Compile HsLua
       shell: cmd
       run: |
-        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
         cd "C:\!\FreeArchiver\HsLua"
         make
 
     - name: Compile SFX modules, Unarc.exe, Unarc.dll and FAR plugin
       shell: cmd
       run: |
-        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
         cd "C:\!\FreeArchiver\Unarc"
         make
 
     - name: Compile console version (Arc.exe)
       shell: cmd
       run: |
-        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
         cd "C:\!\FreeArchiver"
         call compile-O2.cmd
 
     - name: Compile GUI version (FreeArc.exe)
       shell: cmd
       run: |
-        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        :: 编译 GUI 版本必须同时能给 GHC 访问到 gtk2hs 的 bin 目录（里面有 gtk 的 dll 后缀等）
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
         cd "C:\!\FreeArchiver"
         call compile-GUI-O2.cmd
 
