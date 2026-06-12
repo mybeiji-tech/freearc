@@ -34,21 +34,19 @@ jobs:
       run: |
         curl -L "https://downloads.haskell.org/~ghc/6.10.3/ghc-6.10.3-i386-windows.exe" -o ghc-installer.exe
         echo "Installing GHC with comprehensive silent flags..."
-        mkdir "C:\Base\Compiler"
-        :: 同时传入 Inno Setup (/VERYSILENT /SUPPRESSMSGBOXES /DIR=...) 和 NSIS (/S /D=...) 的最高级别静默参数，杜绝一切卡死可能
+        mkdir "C:\Base\Compiler\ghc"
+        :: 同时传入 Inno Setup (/VERYSILENT /SUPPRESSMSGBOXES /DIR=...) 和 NSIS (/S /D=...) 的最高级别静默参数
         start /wait "" ghc-installer.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\Base\Compiler\ghc" /S /D=C:\Base\Compiler\ghc
 
     - name: Download and Install Gtk2Hs 0.10.1
       shell: cmd
       run: |
         curl -L "https://sourceforge.net/projects/gtk2hs/files/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe/download" -o gtk2hs.exe
-        echo "Extracting Gtk2Hs files manually to bypass installer failure..."
-        :: 创建目标目录
+        echo "Installing Gtk2Hs silently so it properly registers with GHC..."
         mkdir "C:\Base\Compiler\gtk2hs"
-        :: 强制用 7z 解压安装程序，忽略安装过程中的脚本错误
-        7z x gtk2hs.exe -o"C:\Base\Compiler\gtk2hs" -y
-        :: 将解压出来的文件路径加入 PATH（注意：如果是通过 7z 解压的，文件可能在 {app} 目录下，需调整）
-        echo "Gtk2Hs extracted. Proceeding to compilation."
+        :: 必须将 GHC 加入 PATH，否则 Gtk2Hs 安装程序找不到 GHC，无法完成 ghc-pkg 注册
+        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        start /wait "" gtk2hs.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\Base\Compiler\gtk2hs" /S /D=C:\Base\Compiler\gtk2hs
 
     - name: Download and Extract 7-zip 9.10 sources
       shell: cmd
