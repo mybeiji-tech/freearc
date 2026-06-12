@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     # 推荐使用 windows-2019，因为 2009 年的 32 位工具链在较老的系统上兼容性更好
-    runs-on: windows-2019 
+    runs-on: windows-latest 
 
     steps:
     - name: Checkout repository
