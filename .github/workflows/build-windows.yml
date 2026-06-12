@@ -118,4 +118,69 @@ jobs:
       shell: cmd
       run: |
         echo "Using direct mirrors and Web Archive fallback for Gtk2Hs..."
-        curl -L "
+        curl -L "https://jaist.dl.sourceforge.net/project/gtk2hs/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe" -o gtk2hs.exe || curl -L "https://master.dl.sourceforge.net/project/gtk2hs/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe" -o gtk2hs.exe || curl -L "https://web.archive.org/web/20130605051936/http://downloads.sourceforge.net/project/gtk2hs/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe" -o gtk2hs.exe
+        
+        mkdir "C:\Base\Compiler\gtk2hs"
+        echo "Forcing extraction of Gtk2Hs using innounp..."
+        cd /d "C:\Base\Compiler\gtk2hs"
+        innounp -x -y "%GITHUB_WORKSPACE%\gtk2hs.exe"
+        
+        if exist "{app}" (
+            xcopy /E /I /H /Y "{app}\*" ".\"
+            rd /S /Q "{app}"
+        )
+        
+        echo "Manually registering Gtk2Hs into GHC package database..."
+        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        
+        if exist "register.bat" (
+            call register.bat
+        ) else if exist "lib\import" (
+            for /r %%i in (*.conf) do ghc-pkg register "%%i" --force
+        )
+
+    - name: Extract Local 7-zip 9.10 sources
+      shell: cmd
+      run: |
+        echo "Using locally provided 7z910.tar.bz2 from repository to bypass network issues..."
+        mkdir "C:\!\FreeArchiver\7zip"
+        7z x "%GITHUB_WORKSPACE%\freearc-src\src\7z910.tar.bz2" -o"C:\!\FreeArchiver\7zip" -y
+        7z x "C:\!\FreeArchiver\7zip\7z910.tar" -o"C:\!\FreeArchiver\7zip" -y
+
+    - name: Compile HsLua
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
+        cd /d "C:\!\FreeArchiver\HsLua"
+        make
+
+    - name: Compile SFX modules, Unarc.exe, Unarc.dll and FAR plugin
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
+        cd /d "C:\!\FreeArchiver\Unarc"
+        make
+
+    - name: Compile console version (Arc.exe)
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
+        cd /d "C:\!\FreeArchiver"
+        call compile-O2.cmd
+
+    - name: Compile GUI version (FreeArc.exe)
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
+        cd /d "C:\!\FreeArchiver"
+        call compile-GUI-O2.cmd
+
+    - name: Upload Artifacts (Exe and Dll)
+      uses: actions/upload-artifact@v4
+      with:
+        name: FreeArc-Windows-Binaries
+        path: |
+          C:\!\FreeArchiver\Tests\Arc.exe
+          C:\!\FreeArchiver\Tests\FreeArc.exe
+          C:\!\FreeArchiver\Unarc\Unarc.exe
+          C:\!\FreeArchiver\Unarc\Unarc.dll
