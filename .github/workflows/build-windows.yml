@@ -5,11 +5,10 @@ on:
     branches: [ master, main ]
   pull_request:
     branches: [ master, main ]
-  workflow_dispatch: # 允许在 Actions 页面手动触发
+  workflow_dispatch:
 
 jobs:
   build:
-    # 推荐使用 windows-2019，因为 2009 年的 32 位工具链在较老的系统上兼容性更好
     runs-on: windows-latest 
 
     steps:
@@ -22,39 +21,36 @@ jobs:
       shell: cmd
       run: |
         echo "Creating hardcoded paths required by Makefile..."
-        mkdir "C:\Base\Compiler\ghc"
+        :: 注意：这里去掉了预先创建 GHC 目录的命令，避免触发安装包的覆盖询问弹窗
         mkdir "C:\!\FreeArchiver"
-        :: 将源码完整复制到硬编码的工作目录
         xcopy /E /I /H /Y "%GITHUB_WORKSPACE%\freearc-src\*" "C:\!\FreeArchiver\"
 
     - name: Install Make
       shell: cmd
       run: |
-        :: 使用 Chocolatey 安装 GNU Make
         choco install make --yes
 
     - name: Download and Install GHC 6.10.3
       shell: cmd
       run: |
-        :: 使用官方归档地址下载旧版 GHC
         curl -L "https://downloads.haskell.org/~ghc/6.10.3/ghc-6.10.3-i386-windows.exe" -o ghc-installer.exe
-        :: /S 为 NSIS 安装器的静默安装参数，/D 指定安装目录
-        ghc-installer.exe /S /D=C:\Base\Compiler\ghc
+        echo "Extracting GHC bypassing installer GUI..."
+        :: 暴力解压代替执行安装包，100% 杜绝 CI 环境后台卡死
+        7z x ghc-installer.exe -o"C:\Base\Compiler\ghc" -y
 
     - name: Download and Install Gtk2Hs 0.10.1
       shell: cmd
       run: |
-        :: 预先将 GHC 放入 PATH，以防 Gtk2Hs 安装时需要寻找 GHC
         set PATH=C:\Base\Compiler\ghc\bin;%PATH%
         curl -L "https://sourceforge.net/projects/gtk2hs/files/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe/download" -o gtk2hs.exe
-        gtk2hs.exe /S
+        :: 使用 start /wait 确保在无头服务器中静默执行完毕再进入下一步
+        start /wait "" gtk2hs.exe /S
 
     - name: Download and Extract 7-zip 9.10 sources
       shell: cmd
       run: |
         curl -L "https://sourceforge.net/projects/sevenzip/files/7-Zip/9.10%20beta/7z910.tar.bz2/download" -o 7z910.tar.bz2
         mkdir "C:\!\FreeArchiver\7zip"
-        :: 解压 bz2 得到 tar，再解压 tar 得到源码（GitHub 镜像自带 7z 命令行工具）
         7z x 7z910.tar.bz2 -o"C:\!\FreeArchiver\7zip"
         7z x "C:\!\FreeArchiver\7zip\7z910.tar" -o"C:\!\FreeArchiver\7zip" -y
 
