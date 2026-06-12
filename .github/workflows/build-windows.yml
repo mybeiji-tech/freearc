@@ -66,7 +66,8 @@ jobs:
       shell: powershell
       run: |
         Write-Host "Fixing tools hardcoded to C:\Base\Compiler\ghc\ in FreeArc Makefiles..."
-        $tools = @("windres.exe", "ar.exe", "ld.exe", "strip.exe", "dllwrap.exe", "gcc.exe")
+        # 核心变动：把 cc1.exe, cc1plus.exe, cpp.exe 加进来，防止 gcc 在被 windres 后台隐式调用时找不到自己的引擎
+        $tools = @("windres.exe", "ar.exe", "ld.exe", "strip.exe", "dllwrap.exe", "gcc.exe", "cc1.exe", "cc1plus.exe", "cpp.exe")
         foreach ($tool in $tools) {
             $dest = "C:\Base\Compiler\ghc\$tool"
             
@@ -92,7 +93,6 @@ jobs:
             }
         }
         
-        # 强制清空隐藏错误码，向 GitHub Actions 宣告本步骤绝对成功
         exit 0
 
     - name: Extract and Manually Register Gtk2Hs 0.10.1
