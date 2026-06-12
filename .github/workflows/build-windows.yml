@@ -16,6 +16,9 @@ jobs:
       uses: actions/checkout@v4
       with:
         path: freearc-src
+        # 核心修复：拉取所有的 Git Submodules，防止 HsLua 等依赖文件夹为空！
+        submodules: recursive
+        fetch-depth: 0
 
     - name: Set up hardcoded directory structure
       shell: cmd
@@ -69,7 +72,7 @@ jobs:
       run: |
         echo "Using locally provided 7z910.tar.bz2 from repository to bypass network issues..."
         mkdir "C:\!\FreeArchiver\7zip"
-        :: 直接从本地仓库的 src 目录下读取你上传好的压缩包进行解压
+        :: 直接从本地仓库的 src 目录下读取压缩包进行解压
         7z x "%GITHUB_WORKSPACE%\freearc-src\src\7z910.tar.bz2" -o"C:\!\FreeArchiver\7zip" -y
         7z x "C:\!\FreeArchiver\7zip\7z910.tar" -o"C:\!\FreeArchiver\7zip" -y
 
@@ -77,28 +80,30 @@ jobs:
       shell: cmd
       run: |
         set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
-        cd "C:\!\FreeArchiver\HsLua"
+        cd /d "C:\!\FreeArchiver\HsLua"
+        :: 打印出文件夹里的所有内容，确认 Makefile 存在
+        dir
         make
 
     - name: Compile SFX modules, Unarc.exe, Unarc.dll and FAR plugin
       shell: cmd
       run: |
         set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
-        cd "C:\!\FreeArchiver\Unarc"
+        cd /d "C:\!\FreeArchiver\Unarc"
         make
 
     - name: Compile console version (Arc.exe)
       shell: cmd
       run: |
         set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
-        cd "C:\!\FreeArchiver"
+        cd /d "C:\!\FreeArchiver"
         call compile-O2.cmd
 
     - name: Compile GUI version (FreeArc.exe)
       shell: cmd
       run: |
         set PATH=C:\Base\Compiler\ghc\bin;C:\Base\Compiler\gtk2hs\bin;%PATH%
-        cd "C:\!\FreeArchiver"
+        cd /d "C:\!\FreeArchiver"
         call compile-GUI-O2.cmd
 
     - name: Upload Artifacts (Exe and Dll)
