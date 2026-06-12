@@ -1,0 +1,97 @@
+name: Build FreeArc (Windows)
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch: # 允许在 Actions 页面手动触发
+
+jobs:
+  build:
+    # 推荐使用 windows-2019，因为 2009 年的 32 位工具链在较老的系统上兼容性更好
+    runs-on: windows-2019 
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        path: freearc-src
+
+    - name: Set up hardcoded directory structure
+      shell: cmd
+      run: |
+        echo "Creating hardcoded paths required by Makefile..."
+        mkdir "C:\Base\Compiler\ghc"
+        mkdir "C:\!\FreeArchiver"
+        :: 将源码完整复制到硬编码的工作目录
+        xcopy /E /I /H /Y "%GITHUB_WORKSPACE%\freearc-src\*" "C:\!\FreeArchiver\"
+
+    - name: Install Make
+      shell: cmd
+      run: |
+        :: 使用 Chocolatey 安装 GNU Make
+        choco install make --yes
+
+    - name: Download and Install GHC 6.10.3
+      shell: cmd
+      run: |
+        :: 使用官方归档地址下载旧版 GHC
+        curl -L "https://downloads.haskell.org/~ghc/6.10.3/ghc-6.10.3-i386-windows.exe" -o ghc-installer.exe
+        :: /S 为 NSIS 安装器的静默安装参数，/D 指定安装目录
+        ghc-installer.exe /S /D=C:\Base\Compiler\ghc
+
+    - name: Download and Install Gtk2Hs 0.10.1
+      shell: cmd
+      run: |
+        :: 预先将 GHC 放入 PATH，以防 Gtk2Hs 安装时需要寻找 GHC
+        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        curl -L "https://sourceforge.net/projects/gtk2hs/files/gtk2hs/0.10.1/gtk2hs-0.10.1-win32-installer.exe/download" -o gtk2hs.exe
+        gtk2hs.exe /S
+
+    - name: Download and Extract 7-zip 9.10 sources
+      shell: cmd
+      run: |
+        curl -L "https://sourceforge.net/projects/sevenzip/files/7-Zip/9.10%20beta/7z910.tar.bz2/download" -o 7z910.tar.bz2
+        mkdir "C:\!\FreeArchiver\7zip"
+        :: 解压 bz2 得到 tar，再解压 tar 得到源码（GitHub 镜像自带 7z 命令行工具）
+        7z x 7z910.tar.bz2 -o"C:\!\FreeArchiver\7zip"
+        7z x "C:\!\FreeArchiver\7zip\7z910.tar" -o"C:\!\FreeArchiver\7zip" -y
+
+    - name: Compile HsLua
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        cd "C:\!\FreeArchiver\HsLua"
+        make
+
+    - name: Compile SFX modules, Unarc.exe, Unarc.dll and FAR plugin
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        cd "C:\!\FreeArchiver\Unarc"
+        make
+
+    - name: Compile console version (Arc.exe)
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        cd "C:\!\FreeArchiver"
+        call compile-O2.cmd
+
+    - name: Compile GUI version (FreeArc.exe)
+      shell: cmd
+      run: |
+        set PATH=C:\Base\Compiler\ghc\bin;%PATH%
+        cd "C:\!\FreeArchiver"
+        call compile-GUI-O2.cmd
+
+    - name: Upload Artifacts (Exe and Dll)
+      uses: actions/upload-artifact@v4
+      with:
+        name: FreeArc-Windows-Binaries
+        path: |
+          C:\!\FreeArchiver\Tests\Arc.exe
+          C:\!\FreeArchiver\Tests\FreeArc.exe
+          C:\!\FreeArchiver\Unarc\Unarc.exe
+          C:\!\FreeArchiver\Unarc\Unarc.dll
